@@ -13,6 +13,8 @@ requirements = ['prometheus-client', 'flask']  # Required for end user.
 
 version = os.environ.get('GITHUB_REF', 'local')
 version = version.split("/")[-1]
+if version.startswith("v"):
+    version = version[1:]
 print(f"VERSION={version}")
  
 setup(
