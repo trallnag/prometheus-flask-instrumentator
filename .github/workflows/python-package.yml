@@ -35,7 +35,7 @@ jobs:
         
     - name: Lint with flake8
       run: |
-        flake8 . --config .flake8 --statistics
+        flake8 --config .flake8 --statistics
         
     - name: Test with pytest
       run: |
