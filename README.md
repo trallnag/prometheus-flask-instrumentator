@@ -1,6 +1,7 @@
 # Prometheus Flask Instrumentator
 
 ![Development Test](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Development%20Test/badge.svg?branch=dev)
+![Production Test](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Production%20Test/badge.svg?branch=master)
 
 Small package to instrument your Flask app transparently. Install with:
 
