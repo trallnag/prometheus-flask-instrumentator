@@ -33,10 +33,6 @@ jobs:
         pip3 install -r requirements-dev.txt
         python setup.py develop 
         
-    - name: Lint with flake8
-      run: |
-        flake8 --config .flake8 --statistics
-        
     - name: Test with pytest
       run: |
         pytest
