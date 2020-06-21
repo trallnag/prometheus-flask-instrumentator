@@ -1,5 +1,7 @@
 # Prometheus Flask Instrumentator
 
+![Development Test](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Development%20Test/badge.svg?branch=dev)
+
 Simple way to instrument a Flask app transparently.
 
 ## Prerequesites
