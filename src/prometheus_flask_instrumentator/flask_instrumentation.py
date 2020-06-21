@@ -1,72 +1,58 @@
 from prometheus_client import Histogram
-from flask import Flask, request, make_response
+from flask import Flask, request
 from timeit import default_timer
 from functools import wraps
 import re
 
-
-DEFAULT_BUCKETS = (
-    .01, .025, .05, .1, .25, .5, .75, 1.0, 2.5, 5.0, 10.0, float("inf"))
-
-
 class FlaskInstrumentator:
-    """Delivers a simple option to instrument your Flask API.
-
-    This class is not a distinct exporter and therefore relies on the 
-    Prometheus Python client already set-up and ready. Reason: So simple that 
-    there is no reason to have an exporter just  for Flask Http requests.
-
-    Two metrics are generated:
-
-    1. Histogram `http_request_duration_seconds` with the labels method, path, 
-       and status. This is basically it already.
-
-    Stuff like bucket size cannot be configured method by method. There should 
-    not be a histogram metric with different bucket sizes. 
-    """
-
     def __init__(
         self,
         app: Flask,
         excluded_paths: list = None,
-        buckets: tuple = DEFAULT_BUCKETS,
+        buckets: tuple = Histogram.DEFAULT_BUCKETS,
         identifier: str = "url_rule",
+        ignore_without_handler: bool = False,
         group_status_codes: bool = True,
-        label_names: tuple = ("method", "handler", "status",)
+        label_names: tuple = ("method", "handler", "status",),
     ):
         """
-        Args:
-            app (Flask): Flask application used.
+        :param app: Flask application used.
 
-            excluded_paths (list, optional): This list of strings will be regex 
-            compiled. Matched patterns will not be recorded. Defaults to None.
+        :param excluded_paths: This list of strings will be regex. compiled. 
+        Matched patterns will not be recorded.
+        
+        :param buckets: Override default buckets. Defaults to Prometheus 
+        histogram default.
 
-            buckets (tuple, optional): Override default buckets. Defaults to 
-            Prometheus histogram default. Important: Always let the last bucket 
-            be infinite.
+        :param identifier: Property of Flask request object used to identify a 
+        request. For example `path` or `url_rule`.
 
-            identifier (str, optional): Property of Flask request object used 
-            to identify a request. For example `path` or `url_rule`. Defaults 
-            to `url_rule`.
+        :param ignore_without_handler: Should a request to a non-existing handler
+        be ignored or not? By default `/doesnotexist` -> `None`.
 
-            group_status_codes (bool, optional): Groups all status codes into 
-            1xx, 2xx and so on. Defaults to `True`. 
-
-            label_names (tuple, optional): Sets the labelnames of the metric. 
-            x[0] -> POST, PUT etc. x[1] /getorder, /login etc. x[2] -> 500, 
-            503. Defaults to ("method", "handler", "status",)
+        :param group_status_codes: Groups all status codes into `1xx`, `2xx` 
+        and so on.
+        
+        :param label_names: Sets the labelnames of the metric. `x[0]` -> `POST`, 
+        `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`, `503`.         
         """
 
         self.app = app
-        self.buckets = buckets
+
+        if buckets[len(buckets) - 1] == float("inf"):
+            self.buckets = buckets
+        else:
+            self.buckets = buckets + float("inf")
+
         self.identifier = identifier
+        self.ignore_without_handler = ignore_without_handler
         self.group_status_codes = group_status_codes
         self.label_names = label_names
 
         if excluded_paths:
             self.excluded_paths = [re.compile(path) for path in excluded_paths]
         else:
-            self.excluded_paths = excluded_paths
+            self.excluded_paths = []
 
     def instrument(self):
         """Performs the actual instrumentation by using Flask hooks."""
@@ -79,8 +65,11 @@ class FlaskInstrumentator:
 
         @self.app.before_request
         def act_before_request():
+            if self.shall_be_ignored(request):
+                return
+
             if (
-                any(pattern.search(request.path) for pattern in self.excluded_paths)
+                any(spattern.search(request.path) for spattern in self.excluded_paths)
                 or hasattr(request, "_custom_do_not_track")
             ):
                 request._custom_do_not_track = True
@@ -90,7 +79,7 @@ class FlaskInstrumentator:
 
         @self.app.after_request
         def act_after_request(response):
-            if hasattr(request, "_custom_do_not_track"):
+            if self.shall_be_ignored(request):
                 return response
 
             # Record duration of request for histogram.
@@ -106,10 +95,9 @@ class FlaskInstrumentator:
 
         @self.app.teardown_request
         def act_on_teardown_request(exception=None):
-            if not exception or hasattr(request, "_custom_do_not_track"):
+            if self.shall_be_ignored(request):
                 return
-            
-            # Record duration of request for histogram.
+
             total_time = max(default_timer() - request._custom_start_time, 0)
 
             histogram.labels(*create_label_tuple(
@@ -122,6 +110,13 @@ class FlaskInstrumentator:
             if self.group_status_codes:
                 code = code[0] + "xx"
             return (method, handler, code,)
+
+    def shall_be_ignored(self, request) -> bool:
+        if hasattr(request, "_custom_do_not_track"):
+            return True
+        if self.ignore_without_handler and not request.url_rule:
+            return True
+        return False
 
     @staticmethod
     def do_not_track():
