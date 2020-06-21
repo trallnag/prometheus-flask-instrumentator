@@ -1,6 +1,6 @@
 # Prometheus Flask Instrumentator
 
-![Version](https://img.shields.io/github/v/release/trallnag/prometheus-flask-instrumentator)
+![Version](https://img.shields.io/github/v/release/trallnag/prometheus-flask-instrumentator?label=Release)
 ![Development Tests](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Development%20Test/badge.svg?branch=dev)
 ![Production Tests](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Production%20Test/badge.svg?branch=master)
 
