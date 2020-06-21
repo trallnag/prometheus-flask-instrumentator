@@ -9,11 +9,15 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-requirements = ['prometheus-client', 'flask']
+requirements = ['prometheus-client', 'flask']  # Required for end user.
 
+version = os.environ.get('GITHUB_REF', 'local')
+version = version.split("/")[-1]
+print(f"VERSION={version}")
+ 
 setup(
     name='prometheus-flask-instrumentator',
-    version='3.0.0',
+    version=version,
     description='Istruments Flask API transparently',
     long_description=long_description,
     long_description_content_type='text/markdown',
