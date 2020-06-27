@@ -20,7 +20,7 @@ print(f"VERSION={version}")
 setup(
     name='prometheus-flask-instrumentator',
     version=version,
-    description='Istruments Flask API transparently',
+    description='Instruments Flask API transparently',
     long_description=long_description,
     long_description_content_type='text/markdown',
     keywords='prometheus instrumentation flask monitoring metrics',
