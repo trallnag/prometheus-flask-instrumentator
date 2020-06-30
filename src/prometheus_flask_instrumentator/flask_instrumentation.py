@@ -95,7 +95,7 @@ class FlaskInstrumentator:
 
         @self.app.teardown_request
         def act_on_teardown_request(exception=None):
-            if self.shall_be_ignored(request):
+            if not exception or self.shall_be_ignored(request):
                 return
 
             total_time = max(default_timer() - request._custom_start_time, 0)
