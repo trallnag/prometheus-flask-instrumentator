@@ -31,13 +31,14 @@ jobs:
 
       - name: Install Poetry and setup cache
         uses: Gr1N/setup-poetry@v2
+      
+      - name: Setup cache
       - uses: actions/cache@v1
         with:
           path: ~/.cache/pypoetry/virtualenvs
           key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
-        run: poetry --version
       
       - name: Install dependencies
         run: poetry install
