@@ -75,3 +75,4 @@ IDE of your choice.
 For formatting, the [black formatter](https://github.com/psf/black) is used.
 Run `black .` in the repository to reformat source files. It will respect
 the black configuration in the `pyproject.toml`.
+
