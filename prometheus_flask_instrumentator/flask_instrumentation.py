@@ -4,6 +4,7 @@ from timeit import default_timer
 from functools import wraps
 import re
 
+
 class FlaskInstrumentator:
     def __init__(
         self,
@@ -56,22 +57,22 @@ class FlaskInstrumentator:
 
     def instrument(self):
         """Performs the actual instrumentation by using Flask hooks."""
-       
+
         histogram = Histogram(
             name="http_request_duration_seconds",
             documentation="Duration of HTTP requests in seconds",
             labelnames=self.label_names,
-            buckets=self.buckets)
+            buckets=self.buckets,
+        )
 
         @self.app.before_request
         def act_before_request():
             if self.shall_be_ignored(request):
                 return
 
-            if (
-                any(spattern.search(request.path) for spattern in self.excluded_paths)
-                or hasattr(request, "_custom_do_not_track")
-            ):
+            if any(
+                spattern.search(request.path) for spattern in self.excluded_paths
+            ) or hasattr(request, "_custom_do_not_track"):
                 request._custom_do_not_track = True
                 return
             else:
@@ -85,10 +86,12 @@ class FlaskInstrumentator:
             # Record duration of request for histogram.
             total_time = max(default_timer() - request._custom_start_time, 0)
 
-            histogram.labels(*self.create_label_tuple(
-                request.method, 
-                getattr(request, self.identifier), 
-                str(response.status_code))
+            histogram.labels(
+                *self.create_label_tuple(
+                    request.method,
+                    getattr(request, self.identifier),
+                    str(response.status_code),
+                )
             ).observe(total_time)
 
             return response
@@ -100,16 +103,20 @@ class FlaskInstrumentator:
 
             total_time = max(default_timer() - request._custom_start_time, 0)
 
-            histogram.labels(*self.create_label_tuple(
-                request.method, 
-                getattr(request, self.identifier), 
-                "500")
+            histogram.labels(
+                *self.create_label_tuple(
+                    request.method, getattr(request, self.identifier), "500"
+                )
             ).observe(total_time)
 
     def create_label_tuple(self, method: str, handler: str, code: str) -> tuple:
         if self.group_status_codes:
             code = code[0] + "xx"
-        return (method, handler, code,)
+        return (
+            method,
+            handler,
+            code,
+        )
 
     def shall_be_ignored(self, request) -> bool:
         if hasattr(request, "_custom_do_not_track"):
@@ -125,5 +132,7 @@ class FlaskInstrumentator:
             def wrapper(*args, **kwargs):
                 request._custom_do_not_track = True
                 return f(*args, **kwargs)
+
             return wrapper
+
         return decorator

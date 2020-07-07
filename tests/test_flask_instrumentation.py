@@ -10,7 +10,8 @@ COUNT = f"{METRIC}_counts"
 SUM = f"{METRIC}_sum"
 BUCKETS = f"{METRIC}_buckets"
 
-def create_app() -> "Flask app":
+
+def create_app():
     app = Flask(__name__)
 
     collectors = list(REGISTRY._collector_to_names.keys())
@@ -38,9 +39,7 @@ def create_app() -> "Flask app":
     @FlaskInstrumentator.do_not_track()
     def metrics():
         data = generate_latest(REGISTRY)
-        headers = {
-            "Content-Type": CONTENT_TYPE_LATEST,
-            "Content-Length": str(len(data))}
+        headers = {"Content-Type": CONTENT_TYPE_LATEST, "Content-Length": str(len(data))}
         return data, 200, headers
 
     return app
@@ -51,8 +50,10 @@ def print_response(response):
     for line in response.data.split(b"\n"):
         print(line.decode())
 
+
 # ==============================================================================
 # Tests
+
 
 def test_app():
     app = create_app()
@@ -61,7 +62,7 @@ def test_app():
     response = client.get("/")
     assert response.status_code == 200
     assert b"Hello World!" in response.data
-    
+
     response = client.get("/path/whatever")
     assert response.status_code == 200
     assert b"whatever" in response.data
@@ -79,9 +80,11 @@ def test_metrics_endpoint_availability():
 
     assert response.status_code == 200
     assert METRIC.encode() in response.data
-    
+
+
 # ------------------------------------------------------------------------------
 # Test status code
+
 
 def test_grouped_status_codes():
     app = create_app()
@@ -121,15 +124,17 @@ def test_ungrouped_status_codes():
     assert b'"4xx"' not in response.data
     assert b'"405"' in response.data
 
+
 # ------------------------------------------------------------------------------
 # Test label names
+
 
 def test_default_label_names():
     app = create_app()
     instrumentator = FlaskInstrumentator(app)
     instrumentator.instrument()
     client = app.test_client()
-    
+
     client.get("/")
 
     response = client.get("/metrics")
@@ -144,23 +149,33 @@ def test_default_label_names():
 
 def test_custom_label_names():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, label_names=('a', 'b', 'c',))
+    instrumentator = FlaskInstrumentator(app=app, label_names=("a", "b", "c",))
     instrumentator.instrument()
     client = app.test_client()
-    
+
     client.get("/")
 
     response = client.get("/metrics")
     print_response(response)
 
-    for label in ('a', 'b', 'c',):
+    for label in (
+        "a",
+        "b",
+        "c",
+    ):
         assert f'{label}="'.encode() in response.data
 
-    for label in ("method", "handler", "status",):
+    for label in (
+        "method",
+        "handler",
+        "status",
+    ):
         assert f'{label}="'.encode() not in response.data
+
 
 # ------------------------------------------------------------------------------
 # Test exclusion of paths
+
 
 def test_do_not_track_decorator():
     app = create_app()
@@ -181,9 +196,7 @@ def test_do_not_track_decorator():
 
 def test_exclude_paths():
     app = create_app()
-    instrumentator = FlaskInstrumentator(
-        app=app,
-        excluded_paths=["/to/exclude"])
+    instrumentator = FlaskInstrumentator(app=app, excluded_paths=["/to/exclude"])
     instrumentator.instrument()
     client = app.test_client()
 
@@ -196,10 +209,11 @@ def test_exclude_paths():
 
     assert b'handler="/"' in response.data
     assert b'handler="/to/exclude"' not in response.data
-    
+
 
 # ------------------------------------------------------------------------------
 # Test identifiers.
+
 
 def test_id_url_rule():
     app = create_app()
@@ -216,7 +230,7 @@ def test_id_url_rule():
 
     assert b'handler="/"' in response.data
     assert b'handler="/path/<page_name>"' in response.data
-    assert b'3feewfewfew' not in response.data
+    assert b"3feewfewfew" not in response.data
 
 
 def test_id_path():
@@ -234,11 +248,13 @@ def test_id_path():
 
     assert b'handler="/"' in response.data
     assert b'handler="/path/<page_name>"' not in response.data
-    assert b'3feewfewfew' in response.data
-    assert b'fefefew' in response.data
+    assert b"3feewfewfew" in response.data
+    assert b"fefefew" in response.data
+
 
 # ------------------------------------------------------------------------------
 # Test ignore_non_handlers
+
 
 def test_not_ignore_non_handlers_url_rule():
     app = create_app()
