@@ -1,6 +1,8 @@
 # Prometheus Flask Instrumentator
 
 ![Version](https://img.shields.io/github/v/release/trallnag/prometheus-flask-instrumentator?label=Release)
+![CI Development](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/CI%20Development/badge.svg)
+![CI Production](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/CI%20Production/badge.svg)
 
 Small package to instrument your Flask app transparently. Install with:
 

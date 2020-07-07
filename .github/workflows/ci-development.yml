@@ -46,3 +46,6 @@ jobs:
 
     - name: Run Pytest
       run: poetry run pytest
+
+    - name: Build package
+      run: poetry build
