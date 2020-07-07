@@ -1,8 +1,6 @@
 # Prometheus Flask Instrumentator
 
 ![Version](https://img.shields.io/github/v/release/trallnag/prometheus-flask-instrumentator?label=Release)
-![Development Tests](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Development%20Test/badge.svg?branch=dev)
-![Production Tests](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/Production%20Test/badge.svg?branch=master)
 
 Small package to instrument your Flask app transparently. Install with:
 
@@ -65,3 +63,15 @@ def metrics():
         'Content-Length': str(len(data))}
     return data, 200, headers
 ```
+
+## Development
+
+Developing and building this package on a local machine requires 
+[Python Poetry](https://python-poetry.org/). I recommend to run Poetry in 
+tandem with [Pyenv](https://github.com/pyenv/pyenv). Once the repository is 
+cloned, run `poetry install` and `poetry shell`. From here you may start the 
+IDE of your choice.
+
+For formatting, the [black formatter](https://github.com/psf/black) is used.
+Run `black .` in the repository to reformat source files. It will respect
+the black configuration in the `pyproject.toml`.
