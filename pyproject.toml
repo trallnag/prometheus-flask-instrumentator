@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "prometheus-flask-instrumentator"
-version = "20.6.1"
+version = "20.7.1"
 description = "Instruments Flask API transparently"
 authors = ["Tim Schwenke <tim.schwenke@protonmail.ch>"]
 license = "MIT"
