@@ -77,7 +77,7 @@ class FlaskInstrumentator:
         def act_before_request():
             if self.shall_be_ignored(request):
                 return
-            
+
             request._custom_start_time = default_timer()
 
         @self.app.after_request
@@ -120,7 +120,7 @@ class FlaskInstrumentator:
             code = code[0] + "xx"
 
         # 'self.should_ignore_untemplated' will always be 'False'
-        
+
         if url_rule:
             handler = url_rule
         elif self.should_group_untemplated:
@@ -128,7 +128,11 @@ class FlaskInstrumentator:
         else:
             handler = url_path
 
-        return (method, handler, code,)
+        return (
+            method,
+            handler,
+            code,
+        )
 
     def shall_be_ignored(self, request) -> bool:
         """Decides if the request should be ignored or not.
@@ -143,7 +147,7 @@ class FlaskInstrumentator:
         if any(p.search(request.path) for p in self.excluded_handlers):
             request._pfi_ignore = True
             return True
-        
+
         if self.should_ignore_untemplated and not request.url_rule:
             request._pfi_ignore = True
             return True
