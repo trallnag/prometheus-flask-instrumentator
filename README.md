@@ -4,8 +4,8 @@
 [![Maintenance](https://img.shields.io/badge/maintained%3F-yes-green.svg)](https://GitHub.com/Naereen/StrapDown.js/graphs/commit-activity)
 [![downloads](https://img.shields.io/pypi/dm/prometheus-flask-instrumentator)](https://pypi.org/project/prometheus-flask-instrumentator/)
 
-[![release](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/test%20branches/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
-[![test branches](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/release/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
+[![release](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/release/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
+[![test branches](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/test%20branches/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
 [![codecov](https://codecov.io/gh/trallnag/prometheus-flask-instrumentator/branch/master/graph/badge.svg)](https://codecov.io/gh/trallnag/prometheus-flask-instrumentator)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
