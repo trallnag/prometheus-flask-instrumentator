@@ -28,6 +28,7 @@ pip = "^20.1.1"
 pytest = "^3.6"
 flake8 = "^3.8"
 black = "^19.10b0"
+pytest-cov = "^2.10.0"
 
 [tool.black]
 line-length = 90
