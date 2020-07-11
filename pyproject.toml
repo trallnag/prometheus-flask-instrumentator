@@ -4,9 +4,9 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "prometheus-flask-instrumentator"
-version = "20.6.1"
+version = "20.7.1"
 description = "Instruments Flask API transparently"
-authors = ["Tim Schwenke <tim.schwenke@protonmail.ch>"]
+authors = ["Tim Schwenke <tim.schwenke+trallnag@protonmail.ch>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/trallnag/prometheus-flask-instrumentator"
@@ -25,9 +25,10 @@ prometheus-client = "^0.8"
 
 [tool.poetry.dev-dependencies]
 pip = "^20.1.1"
-pytest = "^3.6"
 flake8 = "^3.8"
 black = "^19.10b0"
+pytest = "^5.4.3"
+pytest-cov = "^2.10.0"
 
 [tool.black]
 line-length = 90

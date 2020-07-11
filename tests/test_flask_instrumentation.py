@@ -30,6 +30,11 @@ def create_app():
     def exclude():
         return "Exclude me!"
 
+    @app.route("/server_error")
+    def server_error():
+        raise Exception("Test")
+        return "will ever get here"
+
     @app.route("/ignored")
     @FlaskInstrumentator.do_not_track()
     def ignored():
@@ -45,10 +50,14 @@ def create_app():
     return app
 
 
-def print_response(response):
-    print("\nresponse.data:\n")
+def get_response(client, path: str):
+    response = client.get(path)
+
+    print(f"\nResponse  path='{path}' status='{response.status_code}':\n")
     for line in response.data.split(b"\n"):
         print(line.decode())
+
+    return response
 
 
 # ==============================================================================
@@ -59,13 +68,17 @@ def test_app():
     app = create_app()
     client = app.test_client()
 
-    response = client.get("/")
+    response = get_response(client, "/")
     assert response.status_code == 200
     assert b"Hello World!" in response.data
 
-    response = client.get("/path/whatever")
+    response = get_response(client, "/path/whatever")
     assert response.status_code == 200
     assert b"whatever" in response.data
+
+    response = get_response(client, "/metrics")
+    assert response.status_code == 200
+    assert METRIC.encode() not in response.data
 
 
 def test_metrics_endpoint_availability():
@@ -73,17 +86,45 @@ def test_metrics_endpoint_availability():
     FlaskInstrumentator(app).instrument()
     client = app.test_client()
 
-    response = client.get("/")
+    get_response(client, "/")
 
-    response = client.get("/metrics")
-    print_response(response)
-
+    response = get_response(client, "/metrics")
     assert response.status_code == 200
     assert METRIC.encode() in response.data
 
 
+def test_parameter_existence():
+    app = create_app()
+    instrumentator = FlaskInstrumentator(app)
+
+    assert hasattr(instrumentator, "should_group_status_codes")
+    assert instrumentator.should_group_status_codes is True
+
+    assert hasattr(instrumentator, "should_ignore_untemplated")
+    assert instrumentator.should_ignore_untemplated is False
+
+    assert hasattr(instrumentator, "should_group_untemplated")
+    assert instrumentator.should_group_untemplated is True
+
+    assert hasattr(instrumentator, "should_ignore_method")
+    assert instrumentator.should_ignore_method is True
+
+
+def test_label_names():
+    app = create_app()
+    FlaskInstrumentator(app).instrument()
+    client = app.test_client()
+
+    get_response(client, "/")
+
+    response = get_response(client, "/metrics")
+    assert b'method="' in response.data
+    assert b'handler="' in response.data
+    assert b'status="' in response.data
+
+
 # ------------------------------------------------------------------------------
-# Test status code
+# Test status code. should_group_status_codes.
 
 
 def test_grouped_status_codes():
@@ -91,38 +132,79 @@ def test_grouped_status_codes():
     FlaskInstrumentator(app).instrument()
     client = app.test_client()
 
-    client.get("/does_not_exist")  # -> Should be ignored.
-    client.get("/does_not_exist")  # -> Should be ignored.
     client.post("/")  # -> 405 -> 4xx
     client.post("/")  # -> 405 -> 4xx
     client.get("/")  # -> 200 -> 2xx
 
-    response = client.get("/metrics")
-    print_response(response)
-
-    assert b'"2xx"' in response.data
-    assert b'"4xx"' in response.data
-    assert b'"405"' not in response.data
+    response = get_response(client, "/metrics")
+    assert b'status="2xx"' in response.data
+    assert b'status="4xx"' in response.data
+    assert b'status="405"' not in response.data
 
 
 def test_ungrouped_status_codes():
     app = create_app()
-    FlaskInstrumentator(app=app, group_status_codes=False).instrument()
+    FlaskInstrumentator(app=app, should_group_status_codes=False).instrument()
     client = app.test_client()
 
-    client.get("/does_not_exist")  # -> Should be ignored.
-    client.get("/does_not_exist")  # -> Should be ignored.
     client.post("/")  # -> 405
     client.post("/")  # -> 405
     client.get("/")  # -> 200
 
-    response = client.get("/metrics")
-    print_response(response)
+    response = get_response(client, "/metrics")
+    assert b'status="2xx"' not in response.data
+    assert b'status="200"' in response.data
+    assert b'status="4xx"' not in response.data
+    assert b'status="405"' in response.data
 
-    assert b'"2xx"' not in response.data
-    assert b'"200"' in response.data
-    assert b'"4xx"' not in response.data
-    assert b'"405"' in response.data
+
+# ------------------------------------------------------------------------------
+# Test handler templation handling.
+
+
+def test_ignore_untemplated():
+    app = create_app()
+    FlaskInstrumentator(app=app, should_ignore_untemplated=True).instrument()
+    client = app.test_client()
+
+    get_response(client, "/")  # Exists
+    get_response(client, "/fefwefwe4533")  # Does not exist
+    get_response(client, "/booogo")  # Does not exist
+
+    response = get_response(client, "/metrics")
+    assert b'status="4xx"' not in response.data
+    assert b'status="404"' not in response.data
+    assert b'status="2xx"' in response.data
+    assert b'handler="/fefwefwe4533"' not in response.data
+    assert b'handler="none"' not in response.data
+
+
+def test_include_untemplated_dont_group():
+    app = create_app()
+    FlaskInstrumentator(app=app, should_group_untemplated=False).instrument()
+    client = app.test_client()
+
+    get_response(client, "/")  # Exists
+    get_response(client, "/this_does_not_exist")
+
+    response = get_response(client, "/metrics")
+    assert b'handler="/this_does_not_exist"' in response.data
+    assert b'handler="none"' not in response.data
+    assert b'status="4xx"' in response.data
+
+
+def test_include_untemplated_group():
+    app = create_app()
+    FlaskInstrumentator(app=app).instrument()
+    client = app.test_client()
+
+    get_response(client, "/")  # Exists
+    get_response(client, "/this_does_not_exist")
+
+    response = get_response(client, "/metrics")
+    assert b'handler="/this_does_not_exist"' not in response.data
+    assert b'handler="none"' in response.data
+    assert b'status="4xx"' in response.data
 
 
 # ------------------------------------------------------------------------------
@@ -137,8 +219,7 @@ def test_default_label_names():
 
     client.get("/")
 
-    response = client.get("/metrics")
-    print_response(response)
+    response = get_response(client, "/metrics")
 
     for label in instrumentator.label_names:
         assert f'{label}="'.encode() in response.data
@@ -155,8 +236,7 @@ def test_custom_label_names():
 
     client.get("/")
 
-    response = client.get("/metrics")
-    print_response(response)
+    response = get_response(client, "/metrics")
 
     for label in (
         "a",
@@ -179,7 +259,7 @@ def test_custom_label_names():
 
 def test_do_not_track_decorator():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app)
+    instrumentator = FlaskInstrumentator(app, excluded_handlers=[])
     instrumentator.instrument()
     client = app.test_client()
 
@@ -187,16 +267,14 @@ def test_do_not_track_decorator():
     client.get("/ignored")
     client.get("/")
 
-    response = client.get("/metrics")
-    print_response(response)
-
+    response = get_response(client, "/metrics")
     assert b'handler="/ignored"' not in response.data
     assert b'handler="/"' in response.data
 
 
 def test_exclude_paths():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, excluded_paths=["/to/exclude"])
+    instrumentator = FlaskInstrumentator(app=app, excluded_handlers=["/to/exclude"])
     instrumentator.instrument()
     client = app.test_client()
 
@@ -204,104 +282,38 @@ def test_exclude_paths():
     client.get("/to/exclude")
     client.get("/to/exclude")
 
-    response = client.get("/metrics")
-    print_response(response)
-
+    response = get_response(client, "/metrics")
     assert b'handler="/"' in response.data
     assert b'handler="/to/exclude"' not in response.data
 
 
 # ------------------------------------------------------------------------------
-# Test identifiers.
 
 
-def test_id_url_rule():
+def test_bucket_without_inf():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app)
-    instrumentator.instrument()
+    FlaskInstrumentator(app=app, buckets=(1, 2, 3,)).instrument()
     client = app.test_client()
 
     client.get("/")
-    client.get("/path/3feewfewfew")
-    client.get("/path/fefefew")
 
-    response = client.get("/metrics")
-    print_response(response)
-
-    assert b'handler="/"' in response.data
-    assert b'handler="/path/<page_name>"' in response.data
-    assert b"3feewfewfew" not in response.data
-
-
-def test_id_path():
-    app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, identifier="path")
-    instrumentator.instrument()
-    client = app.test_client()
-
-    client.get("/")
-    client.get("/path/3feewfewfew")
-    client.get("/path/fefefew")
-
-    response = client.get("/metrics")
-    print_response(response)
-
-    assert b'handler="/"' in response.data
-    assert b'handler="/path/<page_name>"' not in response.data
-    assert b"3feewfewfew" in response.data
-    assert b"fefefew" in response.data
+    response = get_response(client, "/metrics")
+    assert b"http_request_duration_seconds_bucket" in response.data
 
 
 # ------------------------------------------------------------------------------
-# Test ignore_non_handlers
 
 
-def test_not_ignore_non_handlers_url_rule():
+def test_unhandled_server_error():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app=app)
-    instrumentator.instrument()
+    FlaskInstrumentator(app=app).instrument()
     client = app.test_client()
 
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
+    client.get("/")
 
-    response = client.get("/metrics")
-    print_response(response)
+    response = get_response(client, "/server_error")
+    assert response.status_code == 500
 
-    assert b'handler="None"' in response.data
-    assert b'handler="/dwdqdwqdwqdwq"' not in response.data
-
-
-def test_not_ignore_non_handlers_path():
-    app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, identifier="path")
-    instrumentator.instrument()
-    client = app.test_client()
-
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
-
-    response = client.get("/metrics")
-    print_response(response)
-
-    assert b'handler="None"' not in response.data
-    assert b'handler="/dwdqdwqdwqdwq"' in response.data
-
-
-def test_ignore_non_handlers_url_rule():
-    app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, ignore_without_handler=True)
-    instrumentator.instrument()
-    client = app.test_client()
-
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
-    client.get("/dwdqdwqdwqdwq")
-
-    response = client.get("/metrics")
-    print_response(response)
-
-    assert b'handler="None"' not in response.data
-    assert b'handler="/dwdqdwqdwqdwq"' not in response.data
+    response = get_response(client, "/metrics")
+    assert b'handler="/server_error"' in response.data
+    assert b'status="5xx"' in response.data
