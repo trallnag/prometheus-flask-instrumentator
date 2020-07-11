@@ -30,6 +30,11 @@ def create_app():
     def exclude():
         return "Exclude me!"
 
+    @app.route("/server_error")
+    def server_error():
+        raise Exception("Test")
+        return "will ever get here"
+
     @app.route("/ignored")
     @FlaskInstrumentator.do_not_track()
     def ignored():
@@ -113,7 +118,6 @@ def test_label_names():
     get_response(client, "/")
 
     response = get_response(client, "/metrics")
-
     assert b'method="' in response.data
     assert b'handler="' in response.data
     assert b'status="' in response.data
@@ -133,7 +137,6 @@ def test_grouped_status_codes():
     client.get("/")  # -> 200 -> 2xx
 
     response = get_response(client, "/metrics")
-
     assert b'status="2xx"' in response.data
     assert b'status="4xx"' in response.data
     assert b'status="405"' not in response.data
@@ -149,7 +152,6 @@ def test_ungrouped_status_codes():
     client.get("/")  # -> 200
 
     response = get_response(client, "/metrics")
-
     assert b'status="2xx"' not in response.data
     assert b'status="200"' in response.data
     assert b'status="4xx"' not in response.data
@@ -266,7 +268,6 @@ def test_do_not_track_decorator():
     client.get("/")
 
     response = get_response(client, "/metrics")
-
     assert b'handler="/ignored"' not in response.data
     assert b'handler="/"' in response.data
 
@@ -282,13 +283,11 @@ def test_exclude_paths():
     client.get("/to/exclude")
 
     response = get_response(client, "/metrics")
-
     assert b'handler="/"' in response.data
     assert b'handler="/to/exclude"' not in response.data
 
 
 # ------------------------------------------------------------------------------
-# Test bucket without infinity.
 
 
 def test_bucket_without_inf():
@@ -299,5 +298,22 @@ def test_bucket_without_inf():
     client.get("/")
 
     response = get_response(client, "/metrics")
-
     assert b"http_request_duration_seconds_bucket" in response.data
+
+
+# ------------------------------------------------------------------------------
+
+
+def test_unhandled_server_error():
+    app = create_app()
+    FlaskInstrumentator(app=app).instrument()
+    client = app.test_client()
+
+    client.get("/")
+
+    response = get_response(client, "/server_error")
+    assert response.status_code == 500
+
+    response = get_response(client, "/metrics")
+    assert b'handler="/server_error"' in response.data
+    assert b'status="5xx"' in response.data
