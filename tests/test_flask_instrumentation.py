@@ -217,7 +217,7 @@ def test_default_label_names():
 
     client.get("/")
 
-    response = client.get("/metrics")
+    response = get_response(client, "/metrics")
 
     for label in instrumentator.label_names:
         assert f'{label}="'.encode() in response.data
@@ -234,7 +234,7 @@ def test_custom_label_names():
 
     client.get("/")
 
-    response = client.get("/metrics")
+    response = get_response(client, "/metrics")
 
     for label in (
         "a",
@@ -265,7 +265,7 @@ def test_do_not_track_decorator():
     client.get("/ignored")
     client.get("/")
 
-    response = client.get("/metrics")
+    response = get_response(client, "/metrics")
 
     assert b'handler="/ignored"' not in response.data
     assert b'handler="/"' in response.data
@@ -281,7 +281,23 @@ def test_exclude_paths():
     client.get("/to/exclude")
     client.get("/to/exclude")
 
-    response = client.get("/metrics")
+    response = get_response(client, "/metrics")
 
     assert b'handler="/"' in response.data
     assert b'handler="/to/exclude"' not in response.data
+
+
+# ------------------------------------------------------------------------------
+# Test bucket without infinity.
+
+
+def test_bucket_without_inf():
+    app = create_app()
+    FlaskInstrumentator(app=app, buckets=(1, 2, 3,)).instrument()
+    client = app.test_client()
+
+    client.get("/")
+
+    response = get_response(client, "/metrics")
+
+    assert b"http_request_duration_seconds_bucket" in response.data
