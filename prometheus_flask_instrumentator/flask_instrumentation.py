@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from prometheus_client import Histogram
 from flask import Flask, request
 from timeit import default_timer
@@ -9,51 +11,57 @@ class FlaskInstrumentator:
     def __init__(
         self,
         app: Flask,
-        excluded_paths: list = None,
+        should_group_status_codes: bool = True,
+        should_ignore_untemplated: bool = False,
+        should_group_untemplated: bool = True,
+        should_ignore_method: bool = True,
+        excluded_handlers: list = ["/metrics"],
         buckets: tuple = Histogram.DEFAULT_BUCKETS,
-        identifier: str = "url_rule",
-        ignore_without_handler: bool = False,
-        group_status_codes: bool = True,
         label_names: tuple = ("method", "handler", "status",),
     ):
         """
         :param app: Flask application used.
 
-        :param excluded_paths: This list of strings will be regex. compiled. 
-        Matched patterns will not be recorded.
-        
+        :param should_group_status_codes: Groups all status codes into `1xx`, `2xx` 
+            and so on.
+
+        :param should_ignore_untemplated: Should a request to a non-existing handler
+            be ignored or not? By default False.
+
+        :param should_group_untemplated: Should requests without a matching 
+            template be grouped to handler None? Defaults to True.
+
+        :param should_ignore_method: Should methods (GET, POST, etc.) be ignored? 
+            If True, the label value will always be "ignored". Defaults to True.
+
+        :param excluded_handlers: This list of strings will be regex. compiled. 
+            Matched patterns will not be recorded. Defaults to ["/metrics"].
+
         :param buckets: Override default buckets. Defaults to Prometheus 
-        histogram default.
-
-        :param identifier: Property of Flask request object used to identify a 
-        request. For example `path` or `url_rule`.
-
-        :param ignore_without_handler: Should a request to a non-existing handler
-        be ignored or not? By default `/doesnotexist` -> `None`.
-
-        :param group_status_codes: Groups all status codes into `1xx`, `2xx` 
-        and so on.
+            histogram default.
         
         :param label_names: Sets the labelnames of the metric. `x[0]` -> `POST`, 
-        `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`, `503`.         
+            `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`.         
         """
 
         self.app = app
 
-        if buckets[len(buckets) - 1] == float("inf"):
+        self.should_group_status_codes = should_group_status_codes
+        self.should_ignore_untemplated = should_ignore_untemplated
+        self.should_group_untemplated = should_group_untemplated
+        self.should_ignore_method = should_ignore_method
+
+        if excluded_handlers:
+            self.excluded_handlers = [re.compile(path) for path in excluded_handlers]
+        else:
+            self.excluded_handlers = []
+
+        if buckets[-1] == float("inf"):
             self.buckets = buckets
         else:
-            self.buckets = buckets + float("inf")
+            self.buckets = buckets + (float("inf"),)
 
-        self.identifier = identifier
-        self.ignore_without_handler = ignore_without_handler
-        self.group_status_codes = group_status_codes
         self.label_names = label_names
-
-        if excluded_paths:
-            self.excluded_paths = [re.compile(path) for path in excluded_paths]
-        else:
-            self.excluded_paths = []
 
     def instrument(self):
         """Performs the actual instrumentation by using Flask hooks."""
@@ -69,27 +77,21 @@ class FlaskInstrumentator:
         def act_before_request():
             if self.shall_be_ignored(request):
                 return
-
-            if any(
-                spattern.search(request.path) for spattern in self.excluded_paths
-            ) or hasattr(request, "_custom_do_not_track"):
-                request._custom_do_not_track = True
-                return
-            else:
-                request._custom_start_time = default_timer()
+            
+            request._custom_start_time = default_timer()
 
         @self.app.after_request
         def act_after_request(response):
             if self.shall_be_ignored(request):
                 return response
 
-            # Record duration of request for histogram.
             total_time = max(default_timer() - request._custom_start_time, 0)
 
             histogram.labels(
                 *self.create_label_tuple(
                     request.method,
-                    getattr(request, self.identifier),
+                    request.url_rule,
+                    request.path,
                     str(response.status_code),
                 )
             ).observe(total_time)
@@ -105,24 +107,47 @@ class FlaskInstrumentator:
 
             histogram.labels(
                 *self.create_label_tuple(
-                    request.method, getattr(request, self.identifier), "500"
+                    request.method, request.url_rule, request.path, "500"
                 )
             ).observe(total_time)
 
-    def create_label_tuple(self, method: str, handler: str, code: str) -> tuple:
-        if self.group_status_codes:
+    def create_label_tuple(
+        self, method: str, url_rule: str, url_path: str, code: str
+    ) -> Tuple[str, str, str]:
+        """Processes label values based on config."""
+
+        if self.should_group_status_codes:
             code = code[0] + "xx"
-        return (
-            method,
-            handler,
-            code,
-        )
+
+        # 'self.should_ignore_untemplated' will always be 'False'
+        
+        if url_rule:
+            handler = url_rule
+        elif self.should_group_untemplated:
+            handler = "none"
+        else:
+            handler = url_path
+
+        return (method, handler, code,)
 
     def shall_be_ignored(self, request) -> bool:
-        if hasattr(request, "_custom_do_not_track"):
+        """Decides if the request should be ignored or not.
+        
+        It first checks for the `_pfi_ignore` attribute to reduce CPU cycles in 
+        subsequent runs.
+        """
+
+        if hasattr(request, "_pfi_ignore") and request._pfi_ignore:
             return True
-        if self.ignore_without_handler and not request.url_rule:
+
+        if any(p.search(request.path) for p in self.excluded_handlers):
+            request._pfi_ignore = True
             return True
+        
+        if self.should_ignore_untemplated and not request.url_rule:
+            request._pfi_ignore = True
+            return True
+
         return False
 
     @staticmethod
@@ -130,7 +155,7 @@ class FlaskInstrumentator:
         def decorator(f):
             @wraps(f)
             def wrapper(*args, **kwargs):
-                request._custom_do_not_track = True
+                request._pfi_ignore = True
                 return f(*args, **kwargs)
 
             return wrapper
