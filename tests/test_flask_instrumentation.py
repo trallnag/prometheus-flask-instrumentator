@@ -106,9 +106,6 @@ def test_parameter_existence():
     assert hasattr(instrumentator, "should_group_untemplated")
     assert instrumentator.should_group_untemplated is True
 
-    assert hasattr(instrumentator, "should_ignore_method")
-    assert instrumentator.should_ignore_method is True
-
 
 def test_label_names():
     app = create_app()
