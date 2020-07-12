@@ -14,7 +14,6 @@ class FlaskInstrumentator:
         should_group_status_codes: bool = True,
         should_ignore_untemplated: bool = False,
         should_group_untemplated: bool = True,
-        should_ignore_method: bool = True,
         excluded_handlers: list = ["/metrics"],
         buckets: tuple = Histogram.DEFAULT_BUCKETS,
         label_names: tuple = ("method", "handler", "status",),
@@ -31,9 +30,6 @@ class FlaskInstrumentator:
         :param should_group_untemplated: Should requests without a matching 
             template be grouped to handler None? Defaults to True.
 
-        :param should_ignore_method: Should methods (GET, POST, etc.) be ignored? 
-            If True, the label value will always be "ignored". Defaults to True.
-
         :param excluded_handlers: This list of strings will be regex. compiled. 
             Matched patterns will not be recorded. Defaults to ["/metrics"].
 
@@ -49,7 +45,6 @@ class FlaskInstrumentator:
         self.should_group_status_codes = should_group_status_codes
         self.should_ignore_untemplated = should_ignore_untemplated
         self.should_group_untemplated = should_group_untemplated
-        self.should_ignore_method = should_ignore_method
 
         if excluded_handlers:
             self.excluded_handlers = [re.compile(path) for path in excluded_handlers]
