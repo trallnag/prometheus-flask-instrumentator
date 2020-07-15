@@ -14,9 +14,22 @@ BUCKETS = f"{METRIC}_buckets"
 def create_app():
     app = Flask(__name__)
 
+    # Unregister all collectors.
     collectors = list(REGISTRY._collector_to_names.keys())
+    print(f"before unregister collectors={collectors}")
     for collector in collectors:
         REGISTRY.unregister(collector)
+    print(f"after unregister collectors={list(REGISTRY._collector_to_names.keys())}")
+
+    # Import default collectors.
+    from prometheus_client import platform_collector
+    from prometheus_client import process_collector
+    from prometheus_client import gc_collector
+
+    # Re-register default collectors.
+    process_collector.ProcessCollector()
+    platform_collector.PlatformCollector()
+    gc_collector.GCCollector()
 
     @app.route("/")
     def home():
