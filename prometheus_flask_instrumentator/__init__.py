@@ -1,3 +1,3 @@
-from . import flask_instrumentation
+from . import instrumentation
 
-FlaskInstrumentator = flask_instrumentation.FlaskInstrumentator
+PrometheusFlaskInstrumentator = instrumentation.PrometheusFlaskInstrumentator
