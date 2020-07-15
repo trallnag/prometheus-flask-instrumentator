@@ -1,6 +1,10 @@
+import os
+
 from flask import Flask
-from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
-from prometheus_flask_instrumentator import FlaskInstrumentator
+import pytest
+from prometheus_client import REGISTRY
+
+from prometheus_flask_instrumentator import PrometheusFlaskInstrumentator
 
 # ==============================================================================
 # Setup
@@ -11,7 +15,7 @@ SUM = f"{METRIC}_sum"
 BUCKETS = f"{METRIC}_buckets"
 
 
-def create_app():
+def create_app() -> "app":
     app = Flask(__name__)
 
     # Unregister all collectors.
@@ -49,21 +53,14 @@ def create_app():
         return "will ever get here"
 
     @app.route("/ignored")
-    @FlaskInstrumentator.do_not_track()
+    @PrometheusFlaskInstrumentator.do_not_track()
     def ignored():
         return "HALLO"
-
-    @app.route("/metrics")
-    @FlaskInstrumentator.do_not_track()
-    def metrics():
-        data = generate_latest(REGISTRY)
-        headers = {"Content-Type": CONTENT_TYPE_LATEST, "Content-Length": str(len(data))}
-        return data, 200, headers
 
     return app
 
 
-def get_response(client, path: str):
+def get_response(client, path: str) -> "response":
     response = client.get(path)
 
     print(f"\nResponse  path='{path}' status='{response.status_code}':\n")
@@ -71,6 +68,32 @@ def get_response(client, path: str):
         print(line.decode())
 
     return response
+
+
+def assert_is_not_multiprocess(response) -> None:
+    assert response.status_code == 200
+    assert b"Multiprocess" not in response.data
+    assert b"# HELP process_cpu_seconds_total" in response.data
+
+
+def assert_request_count(
+    expected: float,
+    name: str = "http_request_duration_seconds_count",
+    handler: str = "/",
+    method: str = "GET",
+    status: str = "2xx",
+) -> None:
+    result = REGISTRY.get_sample_value(
+        name, {"handler": handler, "method": method, "status": status}
+    )
+    print(
+        (
+            f"{name} handler={handler} method={method} status={status} "
+            f"result={result} expected={expected}"
+        )
+    )
+    assert result == expected
+    assert result + 1.0 != expected
 
 
 # ==============================================================================
@@ -90,25 +113,25 @@ def test_app():
     assert b"whatever" in response.data
 
     response = get_response(client, "/metrics")
-    assert response.status_code == 200
-    assert METRIC.encode() not in response.data
+    assert response.status_code == 404
 
 
 def test_metrics_endpoint_availability():
     app = create_app()
-    FlaskInstrumentator(app).instrument()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")
 
     response = get_response(client, "/metrics")
-    assert response.status_code == 200
+    assert_is_not_multiprocess(response)
+    assert_request_count(1)
     assert METRIC.encode() in response.data
 
 
 def test_parameter_existence():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app)
+    instrumentator = PrometheusFlaskInstrumentator().instrument(app)
 
     assert hasattr(instrumentator, "should_group_status_codes")
     assert instrumentator.should_group_status_codes is True
@@ -122,12 +145,14 @@ def test_parameter_existence():
 
 def test_label_names():
     app = create_app()
-    FlaskInstrumentator(app).instrument()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")
 
     response = get_response(client, "/metrics")
+    assert_is_not_multiprocess(response)
+    assert_request_count(1)
     assert b'method="' in response.data
     assert b'handler="' in response.data
     assert b'status="' in response.data
@@ -139,14 +164,18 @@ def test_label_names():
 
 def test_grouped_status_codes():
     app = create_app()
-    FlaskInstrumentator(app).instrument()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     client.post("/")  # -> 405 -> 4xx
     client.post("/")  # -> 405 -> 4xx
     client.get("/")  # -> 200 -> 2xx
+    client.get("/")  # -> 200 -> 2xx
+    client.get("/")  # -> 200 -> 2xx
 
     response = get_response(client, "/metrics")
+    assert_is_not_multiprocess(response)
+    assert_request_count(3)
     assert b'status="2xx"' in response.data
     assert b'status="4xx"' in response.data
     assert b'status="405"' not in response.data
@@ -154,7 +183,7 @@ def test_grouped_status_codes():
 
 def test_ungrouped_status_codes():
     app = create_app()
-    FlaskInstrumentator(app=app, should_group_status_codes=False).instrument()
+    PrometheusFlaskInstrumentator(should_group_status_codes=False).instrument(app).expose(app)
     client = app.test_client()
 
     client.post("/")  # -> 405
@@ -174,7 +203,7 @@ def test_ungrouped_status_codes():
 
 def test_ignore_untemplated():
     app = create_app()
-    FlaskInstrumentator(app=app, should_ignore_untemplated=True).instrument()
+    PrometheusFlaskInstrumentator(should_ignore_untemplated=True).instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -191,7 +220,7 @@ def test_ignore_untemplated():
 
 def test_include_untemplated_dont_group():
     app = create_app()
-    FlaskInstrumentator(app=app, should_group_untemplated=False).instrument()
+    PrometheusFlaskInstrumentator(should_group_untemplated=False).instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -205,7 +234,7 @@ def test_include_untemplated_dont_group():
 
 def test_include_untemplated_group():
     app = create_app()
-    FlaskInstrumentator(app=app).instrument()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -223,8 +252,8 @@ def test_include_untemplated_group():
 
 def test_default_label_names():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app)
-    instrumentator.instrument()
+    instrumentator = PrometheusFlaskInstrumentator()
+    instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -240,8 +269,8 @@ def test_default_label_names():
 
 def test_custom_label_names():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, label_names=("a", "b", "c",))
-    instrumentator.instrument()
+    instrumentator = PrometheusFlaskInstrumentator(label_names=("a", "b", "c",))
+    instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -269,8 +298,8 @@ def test_custom_label_names():
 
 def test_do_not_track_decorator():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app, excluded_handlers=[])
-    instrumentator.instrument()
+    instrumentator = PrometheusFlaskInstrumentator(excluded_handlers=[])
+    instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/ignored")
@@ -284,8 +313,8 @@ def test_do_not_track_decorator():
 
 def test_exclude_paths():
     app = create_app()
-    instrumentator = FlaskInstrumentator(app=app, excluded_handlers=["/to/exclude"])
-    instrumentator.instrument()
+    instrumentator = PrometheusFlaskInstrumentator(excluded_handlers=["/to/exclude"])
+    instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -302,7 +331,7 @@ def test_exclude_paths():
 
 def test_bucket_without_inf():
     app = create_app()
-    FlaskInstrumentator(app=app, buckets=(1, 2, 3,)).instrument()
+    PrometheusFlaskInstrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -316,7 +345,7 @@ def test_bucket_without_inf():
 
 def test_unhandled_server_error():
     app = create_app()
-    FlaskInstrumentator(app=app).instrument()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -327,3 +356,54 @@ def test_unhandled_server_error():
     response = get_response(client, "/metrics")
     assert b'handler="/server_error"' in response.data
     assert b'status="5xx"' in response.data
+
+
+# ------------------------------------------------------------------------------
+
+
+def is_prometheus_multiproc_set():
+    if "prometheus_multiproc_dir" in os.environ:
+        pmd = os.environ["prometheus_multiproc_dir"]
+        if os.path.isdir(pmd):
+            return True
+    else:
+        return False
+
+
+# The environment variable MUST be set before anything regarding Prometheus is
+# imported. That is why we cannot simply use `tempfile` or the fixtures
+# provided by pytest. Test with:
+#       mkdir -p /tmp/test_multiproc;
+#       export prometheus_multiproc_dir=/tmp/test_multiproc;
+#       pytest -k test_multiprocess_with_var_set;
+#       rm -rf /tmp/test_multiproc;
+#       unset prometheus_multiproc_dir
+
+
+@pytest.mark.skipif(
+    is_prometheus_multiproc_set() is False,
+    reason="Environment variable must be set before starting Python process.",
+)
+def test_multiprocess_with_var_set():
+    app = create_app()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    client = app.test_client()
+
+    get_response(client, "/")
+
+    response = get_response(client, "/metrics")
+    assert response.status_code == 200
+    assert b"Multiprocess" in response.data
+    assert b"# HELP process_cpu_seconds_total" not in response.data
+    assert b"http_request_duration_seconds" in response.data
+
+
+@pytest.mark.skipif(
+    is_prometheus_multiproc_set() is True, reason="Just test handling of env detection."
+)
+def test_multiprocess_with_var_not_set(monkeypatch, tmp_path):
+    monkeypatch.setenv("prometheus_multiproc_dir", "DOES/NOT/EXIST")
+
+    app = create_app()
+    with pytest.raises(Exception):
+        PrometheusFlaskInstrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
