@@ -4,7 +4,7 @@ from flask import Flask
 import pytest
 from prometheus_client import REGISTRY
 
-from prometheus_flask_instrumentator import PrometheusFlaskInstrumentator
+from prometheus_flask_instrumentator import Instrumentator
 
 # ==============================================================================
 # Setup
@@ -53,7 +53,7 @@ def create_app() -> "app":
         return "will ever get here"
 
     @app.route("/ignored")
-    @PrometheusFlaskInstrumentator.do_not_track()
+    @Instrumentator.do_not_track()
     def ignored():
         return "HALLO"
 
@@ -118,7 +118,7 @@ def test_app():
 
 def test_metrics_endpoint_availability():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")
@@ -131,7 +131,7 @@ def test_metrics_endpoint_availability():
 
 def test_parameter_existence():
     app = create_app()
-    instrumentator = PrometheusFlaskInstrumentator().instrument(app)
+    instrumentator = Instrumentator().instrument(app)
 
     assert hasattr(instrumentator, "should_group_status_codes")
     assert instrumentator.should_group_status_codes is True
@@ -145,7 +145,7 @@ def test_parameter_existence():
 
 def test_label_names():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")
@@ -164,7 +164,7 @@ def test_label_names():
 
 def test_grouped_status_codes():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     client.post("/")  # -> 405 -> 4xx
@@ -183,7 +183,7 @@ def test_grouped_status_codes():
 
 def test_ungrouped_status_codes():
     app = create_app()
-    PrometheusFlaskInstrumentator(should_group_status_codes=False).instrument(app).expose(app)
+    Instrumentator(should_group_status_codes=False).instrument(app).expose(app)
     client = app.test_client()
 
     client.post("/")  # -> 405
@@ -203,7 +203,7 @@ def test_ungrouped_status_codes():
 
 def test_ignore_untemplated():
     app = create_app()
-    PrometheusFlaskInstrumentator(should_ignore_untemplated=True).instrument(app).expose(app)
+    Instrumentator(should_ignore_untemplated=True).instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -220,7 +220,7 @@ def test_ignore_untemplated():
 
 def test_include_untemplated_dont_group():
     app = create_app()
-    PrometheusFlaskInstrumentator(should_group_untemplated=False).instrument(app).expose(app)
+    Instrumentator(should_group_untemplated=False).instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -234,7 +234,7 @@ def test_include_untemplated_dont_group():
 
 def test_include_untemplated_group():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")  # Exists
@@ -252,7 +252,7 @@ def test_include_untemplated_group():
 
 def test_default_label_names():
     app = create_app()
-    instrumentator = PrometheusFlaskInstrumentator()
+    instrumentator = Instrumentator()
     instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
@@ -269,7 +269,7 @@ def test_default_label_names():
 
 def test_custom_label_names():
     app = create_app()
-    instrumentator = PrometheusFlaskInstrumentator(label_names=("a", "b", "c",))
+    instrumentator = Instrumentator(label_names=("a", "b", "c",))
     instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
@@ -298,7 +298,7 @@ def test_custom_label_names():
 
 def test_do_not_track_decorator():
     app = create_app()
-    instrumentator = PrometheusFlaskInstrumentator(excluded_handlers=[])
+    instrumentator = Instrumentator(excluded_handlers=[])
     instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
@@ -313,7 +313,7 @@ def test_do_not_track_decorator():
 
 def test_exclude_paths():
     app = create_app()
-    instrumentator = PrometheusFlaskInstrumentator(excluded_handlers=["/to/exclude"])
+    instrumentator = Instrumentator(excluded_handlers=["/to/exclude"])
     instrumentator.instrument(app).expose(app)
     client = app.test_client()
 
@@ -331,7 +331,7 @@ def test_exclude_paths():
 
 def test_bucket_without_inf():
     app = create_app()
-    PrometheusFlaskInstrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
+    Instrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -345,7 +345,7 @@ def test_bucket_without_inf():
 
 def test_unhandled_server_error():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
@@ -363,30 +363,32 @@ def test_unhandled_server_error():
 
 def test_custom_endpoint():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app, "/custom_metrics")
+    Instrumentator().instrument(app).expose(app, "/custom_metrics")
     client = app.test_client()
 
     client.get("/")
 
     response = get_response(client, "/metrics")
-    assert b'http_request_duration_seconds_bucket' not in response.data
+    assert b"http_request_duration_seconds_bucket" not in response.data
 
     response = get_response(client, "/custom_metrics")
-    assert b'http_request_duration_seconds_bucket' in response.data
+    assert b"http_request_duration_seconds_bucket" in response.data
+
 
 # ------------------------------------------------------------------------------
 
 
 def test_custom_metric_name():
     app = create_app()
-    PrometheusFlaskInstrumentator(metric_name="xzy").instrument(app).expose(app)
+    Instrumentator(metric_name="xzy").instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
 
     response = get_response(client, "/metrics")
-    assert b'http_request_duration_seconds_bucket' not in response.data
-    assert b'xzy_bucket' in response.data
+    assert b"http_request_duration_seconds_bucket" not in response.data
+    assert b"xzy_bucket" in response.data
+
 
 # ------------------------------------------------------------------------------
 
@@ -416,7 +418,7 @@ def is_prometheus_multiproc_set():
 )
 def test_multiprocess_with_var_set():
     app = create_app()
-    PrometheusFlaskInstrumentator().instrument(app).expose(app)
+    Instrumentator().instrument(app).expose(app)
     client = app.test_client()
 
     get_response(client, "/")
@@ -436,4 +438,4 @@ def test_multiprocess_with_var_not_set(monkeypatch, tmp_path):
 
     app = create_app()
     with pytest.raises(Exception):
-        PrometheusFlaskInstrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
+        Instrumentator(buckets=(1, 2, 3,)).instrument(app).expose(app)
