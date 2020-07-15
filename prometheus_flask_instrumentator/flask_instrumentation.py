@@ -1,16 +1,16 @@
+import re
+import os
 from typing import Tuple
+from functools import wraps
+from timeit import default_timer
 
 from prometheus_client import Histogram
 from flask import Flask, request
-from timeit import default_timer
-from functools import wraps
-import re
 
 
 class FlaskInstrumentator:
     def __init__(
         self,
-        app: Flask,
         should_group_status_codes: bool = True,
         should_ignore_untemplated: bool = False,
         should_group_untemplated: bool = True,
@@ -19,8 +19,6 @@ class FlaskInstrumentator:
         label_names: tuple = ("method", "handler", "status",),
     ):
         """
-        :param app: Flask application used.
-
         :param should_group_status_codes: Groups all status codes into `1xx`, `2xx` 
             and so on.
 
@@ -40,8 +38,6 @@ class FlaskInstrumentator:
             `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`.         
         """
 
-        self.app = app
-
         self.should_group_status_codes = should_group_status_codes
         self.should_ignore_untemplated = should_ignore_untemplated
         self.should_group_untemplated = should_group_untemplated
@@ -58,8 +54,12 @@ class FlaskInstrumentator:
 
         self.label_names = label_names
 
-    def instrument(self):
-        """Performs the actual instrumentation by using Flask hooks."""
+    def instrument(self, app: Flask) -> "self":
+        """Performs the actual instrumentation by using Flask hooks.
+        
+        :param app: Flask application to be instrumented.
+        :return: self.
+        """
 
         histogram = Histogram(
             name="http_request_duration_seconds",
@@ -68,22 +68,22 @@ class FlaskInstrumentator:
             buckets=self.buckets,
         )
 
-        @self.app.before_request
+        @app.before_request
         def act_before_request():
-            if self.shall_be_ignored(request):
+            if self._shall_be_ignored(request):
                 return
 
             request._custom_start_time = default_timer()
 
-        @self.app.after_request
+        @app.after_request
         def act_after_request(response):
-            if self.shall_be_ignored(request):
+            if self._shall_be_ignored(request):
                 return response
 
             total_time = max(default_timer() - request._custom_start_time, 0)
 
             histogram.labels(
-                *self.create_label_tuple(
+                *self._create_label_tuple(
                     request.method,
                     request.url_rule,
                     request.path,
@@ -93,20 +93,58 @@ class FlaskInstrumentator:
 
             return response
 
-        @self.app.teardown_request
+        @app.teardown_request
         def act_on_teardown_request(exception=None):
-            if not exception or self.shall_be_ignored(request):
+            if not exception or self._shall_be_ignored(request):
                 return
 
             total_time = max(default_timer() - request._custom_start_time, 0)
 
             histogram.labels(
-                *self.create_label_tuple(
+                *self._create_label_tuple(
                     request.method, request.url_rule, request.path, "500"
                 )
             ).observe(total_time)
 
-    def create_label_tuple(
+        return self
+
+    def expose(self, app: Flask, endpoint: str = "/metrics") -> "self":
+        """Exposes Prometheus metrics by adding endpoint to the given app.
+
+        **Important**: There are many different ways to expose metrics. This is 
+        just one of them, suited for both multiprocess and singleprocess mode. 
+        Refer to the Prometheus Python client documentation for more information.
+
+        :param app: Flask app where the endpoint should be added to.
+        :param endpoint: Route of the endpoint. Defaults to "/metrics".
+        :param return: self.
+        """
+
+        from prometheus_client import REGISTRY, CONTENT_TYPE_LATEST, generate_latest
+        from prometheus_client import multiprocess, CollectorRegistry
+
+        if "prometheus_multiproc_dir" in os.environ:
+            pmd = os.environ["prometheus_multiproc_dir"]
+            if os.path.isdir(pmd):
+                registry = CollectorRegistry()
+                multiprocess.MultiProcessCollector(registry)
+            else:
+                raise ValueError(
+                    f"Env var prometheus_multiproc_dir='{pmd}' not a directory."
+                )
+        else:
+            registry = REGISTRY
+
+        @app.route(endpoint)
+        def metrics():
+            data = generate_latest(REGISTRY)
+            headers = {
+                "Content-Type": CONTENT_TYPE_LATEST,
+                "Content-Length": str(len(data)),
+            }
+            return data, 200, headers
+
+    def _create_label_tuple(
         self, method: str, url_rule: str, url_path: str, code: str
     ) -> Tuple[str, str, str]:
         """Processes label values based on config."""
@@ -129,7 +167,7 @@ class FlaskInstrumentator:
             code,
         )
 
-    def shall_be_ignored(self, request) -> bool:
+    def _shall_be_ignored(self, request) -> bool:
         """Decides if the request should be ignored or not.
         
         It first checks for the `_pfi_ignore` attribute to reduce CPU cycles in 
