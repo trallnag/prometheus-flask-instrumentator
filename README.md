@@ -4,8 +4,8 @@
 [![Maintenance](https://img.shields.io/badge/maintained%3F-yes-green.svg)](https://GitHub.com/Naereen/StrapDown.js/graphs/commit-activity)
 [![downloads](https://img.shields.io/pypi/dm/prometheus-flask-instrumentator)](https://pypi.org/project/prometheus-flask-instrumentator/)
 
-[![release](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/release/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
-[![test branches](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/test%20branches/badge.svg)](https://github.com/trallnag/prometheus-flask-instrumentator)
+![release](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/release/badge.svg)
+![test branches](https://github.com/trallnag/prometheus-flask-instrumentator/workflows/test%20branches/badge.svg)
 [![codecov](https://codecov.io/gh/trallnag/prometheus-flask-instrumentator/branch/master/graph/badge.svg)](https://codecov.io/gh/trallnag/prometheus-flask-instrumentator)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -21,8 +21,8 @@ from prometheus_flask_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 ```
 
-With this single line FastAPI is instrumented and all Prometheus metrics used 
-in the FastAPI app can be exported via the `/metrics` endpoint. 
+With this the Flask app is instrumented and all Prometheus metrics can be 
+scraped via the `/metrics` endpoint. 
 
 The exporter includes the single metric `http_request_duration_seconds`. 
 Basically everything around it can be configured and deactivated. These 
