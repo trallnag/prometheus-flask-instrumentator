@@ -61,7 +61,7 @@ other ways to expose the metrics.
 ## Prerequesites
 
 * `python = "^3.6"` (tested with 3.6 and 3.8)
-* `fastapi = "^1"` (tested with 1.1.2)
+* `flask = "^1"` (tested with 1.1.2)
 * `prometheus-client = "^0.8.0"` (tested with 0.8.0)
 
 ## Development
