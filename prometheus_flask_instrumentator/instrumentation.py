@@ -16,6 +16,7 @@ class PrometheusFlaskInstrumentator:
         should_group_untemplated: bool = True,
         excluded_handlers: list = ["/metrics"],
         buckets: tuple = Histogram.DEFAULT_BUCKETS,
+        metric_name: str = "http_request_duration_seconds",
         label_names: tuple = ("method", "handler", "status",),
     ):
         """
@@ -33,6 +34,9 @@ class PrometheusFlaskInstrumentator:
 
         :param buckets: Override default buckets. Defaults to Prometheus 
             histogram default.
+
+        :param metric_name: Name of the latency metric. Defaults to 
+            "http_request_duration_seconds".
         
         :param label_names: Sets the labelnames of the metric. `x[0]` -> `POST`, 
             `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`.         
@@ -52,6 +56,7 @@ class PrometheusFlaskInstrumentator:
         else:
             self.buckets = buckets + (float("inf"),)
 
+        self.metric_name = metric_name
         self.label_names = label_names
 
     def instrument(self, app: Flask) -> "self":
@@ -62,7 +67,7 @@ class PrometheusFlaskInstrumentator:
         """
 
         histogram = Histogram(
-            name="http_request_duration_seconds",
+            name=self.metric_name,
             documentation="Duration of HTTP requests in seconds",
             labelnames=self.label_names,
             buckets=self.buckets,
