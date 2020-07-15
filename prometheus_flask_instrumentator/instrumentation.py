@@ -8,7 +8,7 @@ from prometheus_client import Histogram
 from flask import Flask, request
 
 
-class FlaskInstrumentator:
+class PrometheusFlaskInstrumentator:
     def __init__(
         self,
         should_group_status_codes: bool = True,
