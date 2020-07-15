@@ -361,6 +361,36 @@ def test_unhandled_server_error():
 # ------------------------------------------------------------------------------
 
 
+def test_custom_endpoint():
+    app = create_app()
+    PrometheusFlaskInstrumentator().instrument(app).expose(app, "/custom_metrics")
+    client = app.test_client()
+
+    client.get("/")
+
+    response = get_response(client, "/metrics")
+    assert b'http_request_duration_seconds_bucket' not in response.data
+
+    response = get_response(client, "/custom_metrics")
+    assert b'http_request_duration_seconds_bucket' in response.data
+
+# ------------------------------------------------------------------------------
+
+
+def test_custom_metric_name():
+    app = create_app()
+    PrometheusFlaskInstrumentator(metric_name="xzy").instrument(app).expose(app)
+    client = app.test_client()
+
+    client.get("/")
+
+    response = get_response(client, "/metrics")
+    assert b'http_request_duration_seconds_bucket' not in response.data
+    assert b'xzy_bucket' in response.data
+
+# ------------------------------------------------------------------------------
+
+
 def is_prometheus_multiproc_set():
     if "prometheus_multiproc_dir" in os.environ:
         pmd = os.environ["prometheus_multiproc_dir"]
