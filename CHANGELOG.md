@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Method `expose()` implements a way to expose the metrics by adding an 
     endpoint to a given Flask app. Compatible with multiprocess mode.
+* Add import alternative `Instrumentator`.
 
 ### Changed
 
+* Rename class to `PrometheusFlaskInstrumentator` from `FlaskInstrumentator`.
 * Switch to SemVer versioning.
 * Split instrumentation and exposition into two parts.
 * Moved pass of Flask object from constructor to `instrument()` method.
