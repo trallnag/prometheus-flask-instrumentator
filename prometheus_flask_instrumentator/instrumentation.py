@@ -14,10 +14,12 @@ class PrometheusFlaskInstrumentator:
         should_group_status_codes: bool = True,
         should_ignore_untemplated: bool = False,
         should_group_untemplated: bool = True,
+        should_round_latency_decimals: bool = False,
         excluded_handlers: list = ["/metrics"],
         buckets: tuple = Histogram.DEFAULT_BUCKETS,
         metric_name: str = "http_request_duration_seconds",
         label_names: tuple = ("method", "handler", "status",),
+        round_latency_decimals: int = 4,
     ):
         """
         :param should_group_status_codes: Groups all status codes into `1xx`, `2xx` 
@@ -29,6 +31,9 @@ class PrometheusFlaskInstrumentator:
         :param should_group_untemplated: Should requests without a matching 
             template be grouped to handler None? Defaults to True.
 
+        :param should_round_latency_decimals: Should recorded latencies be 
+            rounded to a certain number of decimals?
+
         :param excluded_handlers: This list of strings will be regex. compiled. 
             Matched patterns will not be recorded. Defaults to ["/metrics"].
 
@@ -39,12 +44,16 @@ class PrometheusFlaskInstrumentator:
             "http_request_duration_seconds".
         
         :param label_names: Sets the labelnames of the metric. `x[0]` -> `POST`, 
-            `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`.         
+            `PUT` etc. `x[1]` -> `/getorder`, `/login` etc. `x[2]` -> `500`.     
+
+        :param round_latency_decimals: Number of decimals latencies should be 
+            rounded to, provided `should_round_latency_decimals` is `True    
         """
 
         self.should_group_status_codes = should_group_status_codes
         self.should_ignore_untemplated = should_ignore_untemplated
         self.should_group_untemplated = should_group_untemplated
+        self.should_round_latency_decimals = should_round_latency_decimals
 
         if excluded_handlers:
             self.excluded_handlers = [re.compile(path) for path in excluded_handlers]
@@ -58,6 +67,7 @@ class PrometheusFlaskInstrumentator:
 
         self.metric_name = metric_name
         self.label_names = label_names
+        self.round_latency_decimals = round_latency_decimals
 
     def instrument(self, app: Flask) -> "self":
         """Performs the actual instrumentation by using Flask hooks.
@@ -87,6 +97,9 @@ class PrometheusFlaskInstrumentator:
 
             total_time = max(default_timer() - request._custom_start_time, 0)
 
+            if self.should_round_latency_decimals:
+                total_time = round(total_time, self.round_latency_decimals)
+
             histogram.labels(
                 *self._create_label_tuple(
                     request.method,
@@ -104,6 +117,9 @@ class PrometheusFlaskInstrumentator:
                 return
 
             total_time = max(default_timer() - request._custom_start_time, 0)
+
+            if self.should_round_latency_decimals:
+                total_time = round(total_time, self.round_latency_decimals)
 
             histogram.labels(
                 *self._create_label_tuple(

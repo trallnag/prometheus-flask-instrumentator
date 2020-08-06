@@ -391,6 +391,50 @@ def test_custom_metric_name():
 
 
 # ------------------------------------------------------------------------------
+# Test decimal rounding.
+
+
+def test_default_no_rounding():
+    app = create_app()
+    Instrumentator().instrument(app).expose(app)
+    client = app.test_client()
+
+    client.get("/")
+    client.get("/")
+    client.get("/")
+
+    _ = get_response(client, "/metrics")
+
+    result = REGISTRY.get_sample_value(
+        "http_request_duration_seconds_sum",
+        {"handler": "/", "method": "GET", "status": "2xx"},
+    )
+
+    assert len(str(result)) >= 10
+
+
+def test_rounding():
+    app = create_app()
+    Instrumentator(should_round_latency_decimals=True).instrument(
+        app
+    ).expose(app)
+    client = app.test_client()
+
+    client.get("/")
+    client.get("/")
+    client.get("/")
+
+    _ = get_response(client, "/metrics")
+
+    result = REGISTRY.get_sample_value(
+        "http_request_duration_seconds_sum",
+        {"handler": "/", "method": "GET", "status": "2xx"},
+    )
+
+    assert len(str(result).strip("0")) <= 8
+
+
+# ------------------------------------------------------------------------------
 
 
 def is_prometheus_multiproc_set():

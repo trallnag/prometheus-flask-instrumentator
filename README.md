@@ -32,6 +32,7 @@ options include:
 * Requests without a matching template are grouped into the handler `none`.
 * Renaming of labels and the metric.
 * Regex patterns to ignore certain routes.
+* Decimal rounding of latencies.
 
 See the *Example with all parameters* for all possible options or check 
 out the documentation itself.
@@ -45,12 +46,14 @@ PrometheusFlaskInstrumentator(
     should_group_status_codes=False,
     should_ignore_untemplated=False,
     should_group_untemplated=False,
+    should_round_latency_decimals=True,
     excluded_handlers=[
         "admin",            # Unanchored regex.
         "^/secret/.*$"],    # Full regex example.  
     buckets=(1, 2, 3, 4,),
     metric_name="flask_http"
-    label_names=("flask_method", "flask_handler", "flask_status",)
+    label_names=("flask_method", "flask_handler", "flask_status",),
+    round_latency_decimals=3,
 ).instrument(app).expose(app, "/prometheus_metrics")
 ```
 
