@@ -424,8 +424,6 @@ def test_default_no_rounding():
         {"handler": "/", "method": "GET", "status": "2xx"},
     )
 
-    assert len(str(result)) >= 10
-
     entropy = calc_entropy(str(result).split(".")[1][4:])
 
     assert entropy > 15
@@ -449,7 +447,6 @@ def test_rounding():
         {"handler": "/", "method": "GET", "status": "2xx"},
     )
 
-    print(result)
     entropy = calc_entropy(str(result).split(".")[1][4:])
 
     assert entropy < 10
