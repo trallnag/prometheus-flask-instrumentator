@@ -61,6 +61,20 @@ It is important to notice that you don't have to use the `expose()` method if
 adding the endpoint directly to the Flask app does not suit you. There are many 
 other ways to expose the metrics.
 
+The defaults are the following:
+
+```python
+should_group_status_codes: bool = True,
+should_ignore_untemplated: bool = False,
+should_group_untemplated: bool = True,
+should_round_latency_decimals: bool = False,
+excluded_handlers: list = ["/metrics"],
+buckets: tuple = Histogram.DEFAULT_BUCKETS,
+metric_name: str = "http_request_duration_seconds",
+label_names: tuple = ("method", "handler", "status",),
+round_latency_decimals: int = 4,
+```
+
 ## Prerequesites
 
 * `python = "^3.6"` (tested with 3.6 and 3.8)
