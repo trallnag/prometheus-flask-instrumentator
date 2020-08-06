@@ -1,7 +1,7 @@
 import os
 
-from flask import Flask
 import pytest
+from flask import Flask
 from prometheus_client import REGISTRY
 
 from prometheus_flask_instrumentator import Instrumentator
@@ -26,9 +26,8 @@ def create_app() -> "app":
     print(f"after unregister collectors={list(REGISTRY._collector_to_names.keys())}")
 
     # Import default collectors.
-    from prometheus_client import platform_collector
-    from prometheus_client import process_collector
-    from prometheus_client import gc_collector
+    from prometheus_client import (gc_collector, platform_collector,
+                                   process_collector)
 
     # Re-register default collectors.
     process_collector.ProcessCollector()
@@ -431,9 +430,7 @@ def test_default_no_rounding():
 
 def test_rounding():
     app = create_app()
-    Instrumentator(should_round_latency_decimals=True).instrument(
-        app
-    ).expose(app)
+    Instrumentator(should_round_latency_decimals=True).instrument(app).expose(app)
     client = app.test_client()
 
     client.get("/")
