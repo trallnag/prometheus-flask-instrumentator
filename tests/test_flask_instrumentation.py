@@ -400,7 +400,7 @@ def calc_entropy(decimal_str: str):
     entropy = 0
     for i in range(len(decimals)):
         if i != 0:
-            entropy += abs(decimals[i] - decimals[i-1])
+            entropy += abs(decimals[i] - decimals[i - 1])
     return entropy
 
 
