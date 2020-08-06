@@ -1,11 +1,11 @@
-import re
 import os
-from typing import Tuple
+import re
 from functools import wraps
 from timeit import default_timer
+from typing import Tuple
 
-from prometheus_client import Histogram
 from flask import Flask, request
+from prometheus_client import Histogram
 
 
 class PrometheusFlaskInstrumentator:
@@ -141,8 +141,9 @@ class PrometheusFlaskInstrumentator:
         :param return: self.
         """
 
-        from prometheus_client import REGISTRY, CONTENT_TYPE_LATEST, generate_latest
-        from prometheus_client import multiprocess, CollectorRegistry
+        from prometheus_client import (CONTENT_TYPE_LATEST, REGISTRY,
+                                       CollectorRegistry, generate_latest,
+                                       multiprocess)
 
         if "prometheus_multiproc_dir" in os.environ:
             pmd = os.environ["prometheus_multiproc_dir"]
